@@ -1,89 +1,22 @@
 :- include('KB.pl').
 
-% Initial State
-on_board(0, s0).
-aloc(0, 1, s0).
-passengers_on_ship(2, 2, 1, s0).
-passengers_on_ship(1, 2, 1, s0).
+% Successor State
+coast_guard(X, Y, 0, REMAINING_SHIPS, s0):-
+	agent_loc(X, Y),
+	ships_loc(REMAINING_SHIPS).
 
-% result(up, result(retrieve, result(down, s0))).
-
-in_grid(A, B):-
-     grid(X, Y),
-     X1 is X - 1,
-     Y1 is Y - 1,
-     between(0, X1, A),
-     between(0, Y1, B).
-   
-% Successor states
-aloc(A, B, result(up, S)):-
-     % in_grid(A, B),
-     aloc(A1, B, S),
-     A is A1 - 1.
-
-aloc(A, B, result(down, S)):-
-     % in_grid(A, B),
-     aloc(A1, B, S),
-     A is A1 + 1.
-
-aloc(A, B, result(left, S)):-
-     % in_grid(A, B),
-     aloc(A, B1, S),
-     B is B1 - 1.
-
-aloc(A, B, result(right, S)):-
-     % in_grid(A, B),
-     aloc(A, B1, S),
-     B is B1 + 1.
-
-aloc(A, B, result(AC, S)):- 
-     % in_grid(A, B),
-     AC \== up,
-     AC \== down,
-     AC \== left,
-     AC \== right,
-     aloc(A, B, S).
-
-% result(retrieve, result(right, result(down, s0))).
-
-passengers_on_ship(A, B, 0, result(retrieve, S)):-
-     on_board(X, S),
-     capacity(Y),
-     Y > X,
-     aloc(A, B, S),
-     passengers_on_ship(A, B, 1, S).
-
-passengers_on_ship(A, B, X, result(AC, S)):-
-     AC \== retrieve,
-     passengers_on_ship(A, B, X, S).
-
-% on_board(1, resukt(retrieve, result(down, result(retrieve, result(right, result(down, s0)))))).
-on_board(A, result(retrieve, S)):-
-     capacity(X),
-     aloc(SX, SY, S),
-     passengers_on_ship(SX, SY, 1, S),
-     on_board(A2, S),
-     A is A2 + 1,
-     X >= A.
-
-on_board(0, result(drop, S)):-
-     aloc(SX, SY, S),
-     station(SX, SY),
-     on_board(PC, S),
-     PC \== 0.
-
-on_board(A, result(AC, S)):-
-     AC \== retrieve,
-     AC \== drop,
-     on_board(A, S).
+coast_guard(X, Y, OB, RS, result(AC, S)):- 
+	(coast_guard(X1, Y, OB, RS, S),  AC = up, X1 > 0, X is X1 - 1);
+	(coast_guard(X, Y1, OB, RS, S),  AC = left, Y1 > 0, Y is Y1 - 1);
+	(coast_guard(X1, Y, OB, RS, S),  AC = down, grid(N, _), X is X1 + 1, N > X);
+	(coast_guard(X, Y1, OB, RS, S),  AC = right, grid(_, M), Y is Y1 + 1, M > Y);
+	(coast_guard(X, Y, OB1, RS1, S), AC = pickup, member([X, Y], RS1), delete(RS1, [X, Y], RS), OB is OB1 + 1, capacity(C), C >= OB);
+	(coast_guard(X, Y, OB1, RS, S), AC = drop, station(X, Y), OB = 0, OB1 > 0).
 
 % Goal State
 goal(S):-
-     on_board(0, S),
-     station(SX, SY),
-     aloc(SX, SY, S),
-     passengers_on_ship(2, 2, 0, S),
-     passengers_on_ship(1, 2, 0, S).
+	% station(X, Y),
+	call_with_depth_limit(coast_guard(_, _, 0, [], S), 13, _).
 
 ids(X,L):-
      (call_with_depth_limit(goal(X),L,R),number(R));
