@@ -1,90 +1,75 @@
 :- include('KB.pl').
 
-% Initial State
-on_board(0, s0).
-aloc(0, 1, s0).
-passengers_on_ship(2, 2, 1, s0).
-passengers_on_ship(1, 2, 1, s0).
-
-% result(up, result(retrieve, result(down, s0))).
-
-in_grid(A, B):-
-     grid(X, Y),
-     X1 is X - 1,
-     Y1 is Y - 1,
-     between(0, X1, A),
-     between(0, Y1, B).
-   
 % Successor states
-aloc(A, B, result(up, S)):-
-     % in_grid(A, B),
-     aloc(A1, B, S),
-     A is A1 - 1.
+current_loc(X, Y, s0) :-
+	agent_loc(X, Y).
+current_loc(X, Y, result(up, S)):-
+     current_loc(X1, Y, S),
+	 X1 \= 0,
+     X is X1 - 1.
+current_loc(X, Y, result(down, S)):-
+     current_loc(X1, Y, S),
+	 grid(N, _),
+     X is X1 + 1,
+	 X \= N.
+current_loc(X, Y, result(left, S)):-
+     current_loc(X, Y1, S),
+	 Y1 \= 0,
+     Y is Y1 - 1.
+current_loc(X, Y, result(right, S)):-
+     current_loc(X, Y1, S),
+     grid(_, M),
+	 Y is Y1 + 1,
+	 Y \= M.
+current_loc(X, Y, result(AC, S)):- 
+     (AC = drop; AC = retrieve),
+     current_loc(X, Y, S).
 
-aloc(A, B, result(down, S)):-
-     % in_grid(A, B),
-     aloc(A1, B, S),
-     A is A1 + 1.
 
-aloc(A, B, result(left, S)):-
-     % in_grid(A, B),
-     aloc(A, B1, S),
-     B is B1 - 1.
+remaining_passengers(_, P, s0):-
+	ships_loc(LOCS),
+	length(LOCS, P),
+	!.
+remaining_passengers(LOCS, A, result(retrieve, S)):-
+	current_loc(X, Y, S),
+	member([X, Y], LOCS),
+	delete(LOCS, [X, Y], LOCS1),
+	remaining_passengers(LOCS1, A1, S),
+	A is A1 - 1.
+remaining_passengers(LOCS, A, result(AC, S)):-
+	(AC = drop; AC = up; AC = down; AC = left; AC = right),
+	remaining_passengers(LOCS, A, S).
 
-aloc(A, B, result(right, S)):-
-     % in_grid(A, B),
-     aloc(A, B1, S),
-     B is B1 + 1.
 
-aloc(A, B, result(AC, S)):- 
-     % in_grid(A, B),
-     AC \== up,
-     AC \== down,
-     AC \== left,
-     AC \== right,
-     aloc(A, B, S).
+passengers_onboard(0, s0).
+passengers_onboard(A, result(retrieve, S)):-
+	ships_loc(LOCS),
+	current_loc(X, Y, S),
+	member([X, Y], LOCS),
+	capacity(C),
+	passengers_onboard(A1, S),
+	A is A1 + 1,
+	C >= A.
+passengers_onboard(A, result(drop, S)):-
+	station(X, Y),
+	current_loc(X, Y, S),
+	passengers_onboard(A1, S),
+	A is A1 - 1,
+	A >= 0.
+passengers_onboard(A, result(AC, S)):-
+	(AC = up; AC = down; AC = left; AC = right),
+	passengers_onboard(A, S).
 
-% result(retrieve, result(right, result(down, s0))).
 
-passengers_on_ship(A, B, 0, result(retrieve, S)):-
-     on_board(X, S),
-     capacity(Y),
-     Y > X,
-     aloc(A, B, S),
-     passengers_on_ship(A, B, 1, S).
-
-passengers_on_ship(A, B, X, result(AC, S)):-
-     AC \== retrieve,
-     passengers_on_ship(A, B, X, S).
-
-% on_board(1, resukt(retrieve, result(down, result(retrieve, result(right, result(down, s0)))))).
-on_board(A, result(retrieve, S)):-
-     capacity(X),
-     aloc(SX, SY, S),
-     passengers_on_ship(SX, SY, 1, S),
-     on_board(A2, S),
-     A is A2 + 1,
-     X >= A.
-
-on_board(0, result(drop, S)):-
-     aloc(SX, SY, S),
-     station(SX, SY),
-     on_board(PC, S),
-     PC \== 0.
-
-on_board(A, result(AC, S)):-
-     AC \== retrieve,
-     AC \== drop,
-     on_board(A, S).
-
-% Goal State
+% GOAL
 goal(S):-
-     on_board(0, S),
+     passengers_onboard(0, S),
+	 ships_loc(LOCS),
+	 remaining_passengers(LOCS, 0, S),
      station(SX, SY),
-     aloc(SX, SY, S),
-     passengers_on_ship(2, 2, 0, S),
-     passengers_on_ship(1, 2, 0, S).
+     current_loc(SX, SY, S).
 
+% Helper Functions
 ids(X,L):-
      (call_with_depth_limit(goal(X),L,R),number(R));
      (call_with_depth_limit(goal(X),L,R), R=depth_limit_exceeded, L1 is
